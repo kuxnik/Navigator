@@ -135,7 +135,7 @@ List<Polyline> gradePolylines(OverpassTracks o) {
         borderStrokeWidth: 1.5,
         borderColor: const Color(0xFF0B0E10),
         pattern: w.grade == Grade.hard
-            ? const StrokePattern.dashed(segments: [10, 6])
+            ? StrokePattern.dashed(segments: const [10, 6])
             : const StrokePattern.solid(),
       ),
   ];
