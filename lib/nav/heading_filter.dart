@@ -100,7 +100,6 @@ class HeadingFilter {
     hx /= hn;
     hy /= hn;
     hz /= hn;
-    final mx = a[1] * hz - a[2] * hy;
     final my = a[2] * hx - a[0] * hz;
     final mz = a[0] * hy - a[1] * hx;
     // «Вперёд»: если телефон лежит — верх экрана (y), если стоит в держателе — задняя камера (−z).

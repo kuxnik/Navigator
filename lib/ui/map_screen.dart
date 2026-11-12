@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:latlong2/latlong.dart' hide Path;
 
 import '../nav/geo.dart';
 import '../state/app_state.dart';
@@ -63,9 +63,9 @@ class _MapScreenState extends State<MapScreen> {
       // Позиция — в нижней трети экрана, чтобы видеть больше дороги впереди.
       final hgt = MediaQuery.sizeOf(context).height;
       final shift = hgt * 0.2 * metersPerPixel(p.latitude, zoom);
-      center = offsetM(p, shift, h!);
+      center = offsetM(p, shift, h);
     }
-    _mc.moveAndRotate(center, zoom, headingUp ? -h! : 0);
+    _mc.moveAndRotate(center, zoom, headingUp ? -h : 0);
   }
 
   void _setFollow(bool v) {

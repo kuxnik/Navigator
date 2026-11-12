@@ -24,8 +24,8 @@ Widget baseTileLayer(AppState s) {
       userAgentPackageName: kUserAgent,
     );
   }
-  return const TileLayer(
-    key: ValueKey('osm'),
+  return TileLayer(
+    key: const ValueKey('osm'),
     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     maxNativeZoom: 19,
     maxZoom: 20,
@@ -34,8 +34,8 @@ Widget baseTileLayer(AppState s) {
 }
 
 /// Слой публичных GPS-треков OpenStreetMap («здесь кто-то был»).
-Widget osmTracesLayer() => const TileLayer(
-      key: ValueKey('osm_gps'),
+Widget osmTracesLayer() => TileLayer(
+      key: const ValueKey('osm_gps'),
       urlTemplate: 'https://gps.tile.openstreetmap.org/lines/{z}/{x}/{y}.png',
       maxNativeZoom: 20,
       maxZoom: 20,
