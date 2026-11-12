@@ -7,6 +7,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../data/gpx.dart';
 import '../data/mbtiles.dart';
+import '../data/overpass.dart';
 import '../data/models.dart';
 import '../data/storage.dart';
 import '../nav/geo.dart';
@@ -24,6 +25,7 @@ const List<int> kTrackColors = [
 class AppState extends ChangeNotifier {
   final Storage storage = Storage();
   final HeadingFilter headingFilter = HeadingFilter();
+  final OverpassTracks overpass = OverpassTracks();
 
   bool ready = false;
   String? locationError;
@@ -78,6 +80,11 @@ class AppState extends ChangeNotifier {
       if (m.id == id) return m;
     }
     return null;
+  }
+
+  String get baseMapName {
+    if (settings.mapId == kSatMapId) return 'Спутник онлайн (Esri)';
+    return currentMap?.name ?? 'OSM онлайн';
   }
 
   MbTilesSource? get mbSource {

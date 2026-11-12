@@ -87,8 +87,14 @@ class LibraryScreen extends StatelessWidget {
               _MapTile(
                 title: 'OSM онлайн',
                 subtitle: 'нужен интернет · запасной вариант',
-                selected: s.currentMap == null,
+                selected: s.settings.mapId == null || (s.currentMap == null && s.settings.mapId != kSatMapId),
                 onTap: () => s.selectMap(null),
+              ),
+              _MapTile(
+                title: 'Спутник онлайн (Esri)',
+                subtitle: 'нужен интернет · видно накатанные колеи',
+                selected: s.settings.mapId == kSatMapId,
+                onTap: () => s.updateSettings((x) => x.mapId = kSatMapId),
               ),
               for (final m in s.maps)
                 _MapTile(

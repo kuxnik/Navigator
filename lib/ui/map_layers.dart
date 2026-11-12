@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../data/mbtiles.dart';
+import '../data/overpass.dart';
 import '../data/models.dart';
 import '../nav/geo.dart';
 import '../state/app_state.dart';
@@ -11,6 +12,15 @@ const String kUserAgent = 'ru.kuxnik.navigator';
 
 /// Подложка: выбранная карта .mbtiles или онлайн OSM, если карт нет.
 Widget baseTileLayer(AppState s) {
+  if (s.settings.mapId == kSatMapId) {
+    return TileLayer(
+      key: const ValueKey('sat'),
+      urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      maxNativeZoom: 19,
+      maxZoom: 20,
+      userAgentPackageName: kUserAgent,
+    );
+  }
   final m = s.currentMap;
   final src = s.mbSource;
   if (m != null && src != null) {
@@ -100,4 +110,34 @@ List<Polyline> trackPolylines(Track t, {required bool carOnly, double width = 3.
         borderColor: const Color(0xFF0B0E10),
       ),
   ];
+}
+
+const Map<Grade, Color> kGradeColors = {
+  Grade.good: Color(0xFF5FD38D),
+  Grade.medium: Color(0xFFFFB020),
+  Grade.hard: Color(0xFFFF6B4A),
+  Grade.unknown: Color(0xFFD9B98A),
+};
+
+int _gradesVersion = -1;
+List<Polyline> _gradesCache = const [];
+
+/// Грунтовки OSM, раскрашенные по проходимости. «Только джип» — пунктиром.
+List<Polyline> gradePolylines(OverpassTracks o) {
+  if (o.version == _gradesVersion) return _gradesCache;
+  _gradesVersion = o.version;
+  _gradesCache = [
+    for (final w in o.ways.values)
+      Polyline(
+        points: w.points,
+        strokeWidth: w.grade == Grade.unknown ? 2.5 : 3.5,
+        color: kGradeColors[w.grade]!,
+        borderStrokeWidth: 1.5,
+        borderColor: const Color(0xFF0B0E10),
+        pattern: w.grade == Grade.hard
+            ? const StrokePattern.dashed(segments: [10, 6])
+            : const StrokePattern.solid(),
+      ),
+  ];
+  return _gradesCache;
 }

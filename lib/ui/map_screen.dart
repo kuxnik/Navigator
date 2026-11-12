@@ -51,12 +51,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
   void initState() {
     super.initState();
     s.addListener(_onState);
+    s.overpass.addListener(_onState);
     _ticker = createTicker(_onFrame)..start();
   }
 
   @override
   void dispose() {
     s.removeListener(_onState);
+    s.overpass.removeListener(_onState);
     _followResume?.cancel();
     _ticker.dispose();
     _disp.dispose();
@@ -67,6 +69,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
 
   void _onState() {
     if (!mounted) return;
+    _maybeLoadGrades();
     setState(() {});
   }
 
@@ -110,6 +113,20 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     if (!moved) return;
     _disp.value = _Disp(_dPos!, _dHead);
     if (_mapReady && _follow) _applyFollow();
+  }
+
+  DateTime _lastGradeCheck = DateTime(2000);
+
+  /// Подгрузить грунтовки OSM для видимой области (не чаще раза в 2 с, от 12-го масштаба).
+  void _maybeLoadGrades({bool force = false}) {
+    if (!_mapReady || !s.settings.osmGrades) return;
+    final cam = _mc.camera;
+    if (cam.zoom < 12) return;
+    final now = DateTime.now();
+    if (!force && now.difference(_lastGradeCheck).inSeconds < 2) return;
+    _lastGradeCheck = now;
+    final b = cam.visibleBounds;
+    scheduleMicrotask(() => s.overpass.ensure(b.south, b.west, b.north, b.east));
   }
 
   void _applyFollow() {
@@ -218,6 +235,9 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     final tgt = s.target;
     final children = <Widget>[baseTileLayer(s)];
     if (s.settings.osmTraces) children.add(osmTracesLayer());
+    if (s.settings.osmGrades && _zoom >= 11 && s.overpass.ways.isNotEmpty) {
+      children.add(PolylineLayer(polylines: gradePolylines(s.overpass)));
+    }
 
     final polys = <Polyline>[];
     if (s.settings.mineLayer) {
@@ -340,9 +360,11 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
           _mapReady = true;
           _zoom = _mc.camera.zoom;
           if (_follow) _applyFollow();
+          _maybeLoadGrades(force: true);
         },
         onPositionChanged: (camera, hasGesture) {
           _zoom = camera.zoom;
+          _maybeLoadGrades();
           if (hasGesture) _onUserGesture();
         },
         onLongPress: (tapPosition, point) =>

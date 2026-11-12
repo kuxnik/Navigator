@@ -11,7 +11,7 @@ void showLayersSheet(BuildContext context, AppState s) {
     showDragHandle: true,
     isScrollControlled: true,
     builder: (c) => ListenableBuilder(
-      listenable: s,
+      listenable: Listenable.merge([s, s.overpass]),
       builder: (c, _) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
@@ -26,13 +26,47 @@ void showLayersSheet(BuildContext context, AppState s) {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   leading: const Icon(Icons.map_outlined, color: C.text2),
                   title: const Text('Подложка', style: TextStyle(fontSize: 12, color: C.text2)),
-                  subtitle: Text(s.currentMap?.name ?? 'OSM онлайн',
+                  subtitle: Text(s.baseMapName,
                       style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: C.text)),
                   trailing: const Icon(Icons.chevron_right, color: C.text2),
                   onTap: () {
                     Navigator.pop(c);
                     Navigator.push(context, MaterialPageRoute(builder: (_) => LibraryScreen(state: s)));
                   },
+                ),
+              ),
+              const SizedBox(height: 8),
+              _box(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SwitchListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                      secondary: const Icon(Icons.alt_route, color: Color(0xFFFF6B4A)),
+                      title: const Row(children: [
+                        Flexible(child: Text('Грунтовки по проходимости', style: TextStyle(fontWeight: FontWeight.w600))),
+                        SizedBox(width: 8),
+                        _Badge('онлайн', Color(0xFF33264A), Color(0xFFD9B8FF)),
+                      ]),
+                      subtitle: Text(
+                        s.overpass.loading
+                            ? 'загружаю дороги для этого места…'
+                            : (s.overpass.error ?? 'дороги-«грунтовки» из OSM, видны с масштаба 12 · ${s.overpass.ways.length} шт.'),
+                        style: TextStyle(fontSize: 12, color: s.overpass.error != null ? C.red : C.text2),
+                      ),
+                      value: s.settings.osmGrades,
+                      onChanged: (v) => s.updateSettings((x) => x.osmGrades = v),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 12, 12),
+                      child: Wrap(spacing: 14, runSpacing: 6, children: [
+                        _Legend(Color(0xFF5FD38D), 'любая машина'),
+                        _Legend(Color(0xFFFFB020), 'кроссовер'),
+                        _Legend(Color(0xFFFF6B4A), 'джип', dashed: true),
+                        _Legend(Color(0xFFD9B98A), 'нет данных'),
+                      ]),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 8),
@@ -118,4 +152,27 @@ class _Badge extends StatelessWidget {
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
         child: Text(text, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
       );
+}
+
+class _Legend extends StatelessWidget {
+  const _Legend(this.color, this.text, {this.dashed = false});
+
+  final Color color;
+  final String text;
+  final bool dashed;
+
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          for (var i = 0; i < (dashed ? 2 : 1); i++)
+            Container(
+              width: dashed ? 8 : 20,
+              height: 4,
+              margin: EdgeInsets.only(right: dashed ? 4 : 0),
+              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+            ),
+        ]),
+        const SizedBox(width: 6),
+        Text(text, style: const TextStyle(fontSize: 12, color: Color(0xFFD5DAE0))),
+      ]);
 }

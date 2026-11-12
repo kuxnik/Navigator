@@ -202,8 +202,11 @@ class MapInfo {
   }
 }
 
+const String kSatMapId = '__sat';
+
 class Settings {
-  String? mapId; // null — онлайн OSM
+  String? mapId; // null — онлайн OSM, kSatMapId — спутник онлайн
+  bool osmGrades = true;
   bool osmTraces = false;
   bool mineLayer = true;
   bool carOnly = false;
@@ -214,6 +217,7 @@ class Settings {
   Map<String, dynamic> toJson() => {
         'mapId': mapId,
         'osmTraces': osmTraces,
+        'osmGrades': osmGrades,
         'mineLayer': mineLayer,
         'carOnly': carOnly,
         'ruler': ruler,
@@ -224,6 +228,7 @@ class Settings {
   static Settings fromJson(Map<String, dynamic> j) => Settings()
     ..mapId = j['mapId'] as String?
     ..osmTraces = j['osmTraces'] as bool? ?? false
+    ..osmGrades = j['osmGrades'] as bool? ?? true
     ..mineLayer = j['mineLayer'] as bool? ?? true
     ..carOnly = j['carOnly'] as bool? ?? false
     ..ruler = j['ruler'] as bool? ?? true
