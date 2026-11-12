@@ -73,6 +73,22 @@ void showLayersSheet(BuildContext context, AppState s) {
               _box(
                 child: SwitchListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  secondary: const Icon(Icons.local_fire_department, color: Color(0xFFFF8A3D)),
+                  title: const Row(children: [
+                    Flexible(child: Text('Тепловая карта Strava', style: TextStyle(fontWeight: FontWeight.w600))),
+                    SizedBox(width: 8),
+                    _Badge('онлайн', Color(0xFF33264A), Color(0xFFD9B8FF)),
+                  ]),
+                  subtitle: const Text('где ездили и ходили люди со Strava: чем ярче, тем чаще',
+                      style: TextStyle(fontSize: 12, color: C.text2)),
+                  value: s.settings.strava,
+                  onChanged: (v) => s.updateSettings((x) => x.strava = v),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _box(
+                child: SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   secondary: const Icon(Icons.timeline, color: C.purple),
                   title: const Row(children: [
                     Flexible(child: Text('Здесь кто-то был', style: TextStyle(fontWeight: FontWeight.w600))),

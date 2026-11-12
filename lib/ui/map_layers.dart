@@ -52,6 +52,17 @@ Widget osmTracesLayer() => TileLayer(
       userAgentPackageName: kUserAgent,
     );
 
+/// Тепловая карта Strava (все виды активности). Детальные тайлы — через прокси
+/// nakarte.me; если он не ответил — открытые тайлы Strava низкого разрешения.
+Widget stravaLayer() => TileLayer(
+      key: const ValueKey('strava'),
+      urlTemplate: 'https://proxy.nakarte.me/https/heatmap-external-a.strava.com/tiles-auth/all/hot/{z}/{x}/{y}.png?px=256',
+      fallbackUrl: 'https://heatmap-external-a.strava.com/tiles/all/hot/{z}/{x}/{y}.png?px=256',
+      maxNativeZoom: 15,
+      maxZoom: 20,
+      userAgentPackageName: kUserAgent,
+    );
+
 final Map<String, List<List<LatLng>>> _trackCache = {};
 
 /// Линии трека для отрисовки: прорежено (не чаще 3 м), при [carOnly] —

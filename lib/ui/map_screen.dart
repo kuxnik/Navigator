@@ -234,6 +234,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     final p = s.pos;
     final tgt = s.target;
     final children = <Widget>[baseTileLayer(s)];
+    if (s.settings.strava) children.add(stravaLayer());
     if (s.settings.osmTraces) children.add(osmTracesLayer());
     if (s.settings.osmGrades && _zoom >= 11 && s.overpass.ways.isNotEmpty) {
       children.add(PolylineLayer(polylines: gradePolylines(s.overpass)));
