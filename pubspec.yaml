@@ -1,7 +1,7 @@
 name: navigator
 description: Офлайн-навигатор для машины — карты mbtiles, точки, треки, курс по гироскопу с поправкой по GPS.
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.1+1
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

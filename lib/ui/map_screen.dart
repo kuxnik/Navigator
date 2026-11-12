@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
@@ -22,12 +25,25 @@ class MapScreen extends StatefulWidget {
   State<MapScreen> createState() => _MapScreenState();
 }
 
-class _MapScreenState extends State<MapScreen> {
+/// Сглаженные позиция и курс, которые рисуются каждый кадр.
+class _Disp {
+  const _Disp(this.pos, this.heading);
+  final LatLng pos;
+  final double? heading;
+}
+
+class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMixin {
   final MapController _mc = MapController();
   bool _mapReady = false;
   bool _follow = true;
   Timer? _followResume;
   double _zoom = 15;
+
+  late final Ticker _ticker;
+  final ValueNotifier<_Disp?> _disp = ValueNotifier<_Disp?>(null);
+  Duration _lastElapsed = Duration.zero;
+  LatLng? _dPos;
+  double? _dHead;
 
   AppState get s => widget.state;
 
@@ -35,12 +51,15 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     s.addListener(_onState);
+    _ticker = createTicker(_onFrame)..start();
   }
 
   @override
   void dispose() {
     s.removeListener(_onState);
     _followResume?.cancel();
+    _ticker.dispose();
+    _disp.dispose();
     super.dispose();
   }
 
@@ -48,14 +67,55 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onState() {
     if (!mounted) return;
-    if (_mapReady && _follow) _applyFollow();
     setState(() {});
   }
 
-  void _applyFollow() {
+  /// Каждый кадр экрана: курс с гироскопа без задержки, позиция между
+  /// отсчётами GPS достраивается по скорости и курсу, всё плавно сглаживается.
+  void _onFrame(Duration elapsed) {
+    final dt = ((elapsed - _lastElapsed).inMicroseconds / 1e6).clamp(0.0, 0.1);
+    _lastElapsed = elapsed;
     final p = s.pos;
     if (p == null) return;
     final h = s.heading;
+
+    var target = p;
+    final lf = s.lastFix;
+    if (h != null && s.speed > 1 && lf != null && !s.deadReckoning) {
+      final age = DateTime.now().difference(lf).inMilliseconds / 1000.0;
+      target = offsetM(p, s.speed * age.clamp(0.0, 1.5), h);
+    }
+
+    final aPos = 1 - math.exp(-dt / 0.25);
+    final aHead = 1 - math.exp(-dt / 0.06);
+    final prev = _dPos;
+    if (prev == null || distanceM(prev, target) > 300) {
+      _dPos = target;
+    } else {
+      _dPos = LatLng(
+        prev.latitude + (target.latitude - prev.latitude) * aPos,
+        prev.longitude + (target.longitude - prev.longitude) * aPos,
+      );
+    }
+    if (h != null) {
+      final ph = _dHead;
+      _dHead = ph == null ? h : wrap360(ph + wrap180(h - ph) * aHead);
+    }
+
+    final old = _disp.value;
+    final moved = old == null ||
+        distanceM(old.pos, _dPos!) > 0.02 ||
+        (old.heading == null) != (_dHead == null) ||
+        (old.heading != null && _dHead != null && wrap180(old.heading! - _dHead!).abs() > 0.05);
+    if (!moved) return;
+    _disp.value = _Disp(_dPos!, _dHead);
+    if (_mapReady && _follow) _applyFollow();
+  }
+
+  void _applyFollow() {
+    final p = _dPos ?? s.pos;
+    if (p == null) return;
+    final h = _dHead ?? s.heading;
     final headingUp = s.settings.headingUp && h != null;
     final zoom = _mc.camera.zoom;
     var center = p;
@@ -147,9 +207,14 @@ class _MapScreenState extends State<MapScreen> {
 
   // ---------- Карта ----------
 
+  /// Слой, который перерисовывается каждый кадр по сглаженной позиции и курсу.
+  Widget _live(Widget Function(LatLng p, double? h) build) => ValueListenableBuilder<_Disp?>(
+        valueListenable: _disp,
+        builder: (context, d, _) => d == null ? const SizedBox.shrink() : build(d.pos, d.heading),
+      );
+
   Widget _map() {
     final p = s.pos;
-    final h = s.heading;
     final tgt = s.target;
     final children = <Widget>[baseTileLayer(s)];
     if (s.settings.osmTraces) children.add(osmTracesLayer());
@@ -170,17 +235,24 @@ class _MapScreenState extends State<MapScreen> {
         borderColor: C.halo,
       ));
     }
-    if (p != null && tgt != null) {
-      polys.add(Polyline(
-        points: [p, tgt.pos],
-        strokeWidth: 3,
-        color: C.accent,
-        pattern: const StrokePattern.dotted(spacingFactor: 2.5),
-      ));
-    }
     if (polys.isNotEmpty) children.add(PolylineLayer(polylines: polys));
 
-    if (p != null && h != null && s.settings.ruler) children.addAll(_rulerLayers(p, h));
+    if (tgt != null) {
+      children.add(_live((dp, dh) => PolylineLayer(polylines: [
+            Polyline(
+              points: [dp, tgt.pos],
+              strokeWidth: 3,
+              color: C.accent,
+              pattern: const StrokePattern.dotted(spacingFactor: 2.5),
+            ),
+          ])));
+    }
+
+    if (s.settings.ruler) {
+      for (var i = 0; i < 3; i++) {
+        children.add(_live((dp, dh) => dh == null ? const SizedBox.shrink() : _rulerLayers(dp, dh)[i]));
+      }
+    }
 
     // Точки
     children.add(MarkerLayer(
@@ -220,42 +292,40 @@ class _MapScreenState extends State<MapScreen> {
     ));
 
     // Я
-    if (p != null) {
-      final acc = s.shownAccuracy;
-      final dr = s.deadReckoning;
-      if (acc != null && acc > 0) {
-        children.add(CircleLayer(circles: [
-          CircleMarker(
-            point: p,
-            radius: acc,
-            useRadiusInMeter: true,
-            color: dr ? const Color(0x1FFFB020) : const Color(0x294DA3FF),
-            borderColor: dr ? const Color(0x99FFB020) : const Color(0x804DA3FF),
-            borderStrokeWidth: 1.5,
-          ),
-        ]));
-      }
-      children.add(MarkerLayer(rotate: true, markers: [
-        Marker(
-          point: p,
-          width: 44,
-          height: 44,
-          child: h == null
-              ? Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: dr ? C.grey : C.blue,
-                    border: Border.all(color: Colors.white, width: 3),
-                  ),
-                  margin: const EdgeInsets.all(12),
-                )
-              : Transform.rotate(
-                  angle: deg2rad(h + _rotation),
-                  child: CustomPaint(painter: _ArrowPainter(dr ? C.grey : C.blue)),
-                ),
-        ),
-      ]));
+    final acc = s.shownAccuracy;
+    final dr = s.deadReckoning;
+    if (acc != null && acc > 0) {
+      children.add(_live((dp, dh) => CircleLayer(circles: [
+            CircleMarker(
+              point: dp,
+              radius: acc,
+              useRadiusInMeter: true,
+              color: dr ? const Color(0x1FFFB020) : const Color(0x294DA3FF),
+              borderColor: dr ? const Color(0x99FFB020) : const Color(0x804DA3FF),
+              borderStrokeWidth: 1.5,
+            ),
+          ])));
     }
+    children.add(_live((dp, dh) => MarkerLayer(rotate: true, markers: [
+          Marker(
+            point: dp,
+            width: 44,
+            height: 44,
+            child: dh == null
+                ? Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: dr ? C.grey : C.blue,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    margin: const EdgeInsets.all(12),
+                  )
+                : Transform.rotate(
+                    angle: deg2rad(dh + _rotation),
+                    child: CustomPaint(painter: _ArrowPainter(dr ? C.grey : C.blue)),
+                  ),
+          ),
+        ])));
 
     final start = p ?? const LatLng(55.7558, 37.6173);
     return FlutterMap(
@@ -290,7 +360,6 @@ class _MapScreenState extends State<MapScreen> {
     if (p == null || t == null) return const SizedBox.shrink();
     final dist = distanceM(p, t.pos);
     final brg = bearingDeg(p, t.pos);
-    final screenAngle = brg + _rotation;
     return GestureDetector(
       onTap: () => openPointEditor(context, s, t),
       child: Panel(
@@ -301,9 +370,12 @@ class _MapScreenState extends State<MapScreen> {
               width: 60,
               height: 60,
               decoration: const BoxDecoration(color: Color(0xFF2A2310), shape: BoxShape.circle),
-              child: Transform.rotate(
-                angle: deg2rad(screenAngle),
-                child: const Icon(Icons.navigation, color: C.accent, size: 40),
+              child: ValueListenableBuilder<_Disp?>(
+                valueListenable: _disp,
+                builder: (context, d, _) => Transform.rotate(
+                  angle: deg2rad(brg + _rotation),
+                  child: const Icon(Icons.navigation, color: C.accent, size: 40),
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -404,9 +476,12 @@ class _MapScreenState extends State<MapScreen> {
               _mc.rotate(0);
             }
           },
-          child: Transform.rotate(
-            angle: deg2rad(_rotation),
-            child: CustomPaint(size: const Size(30, 30), painter: _NorthPainter()),
+          child: ValueListenableBuilder<_Disp?>(
+            valueListenable: _disp,
+            builder: (context, d, _) => Transform.rotate(
+              angle: deg2rad(_rotation),
+              child: CustomPaint(size: const Size(30, 30), painter: _NorthPainter()),
+            ),
           ),
         ),
         const SizedBox(height: 8),

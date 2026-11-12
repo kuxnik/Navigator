@@ -1,5 +1,6 @@
 """Дополняет сгенерированный `flutter create` Android-проект:
 разрешения, название приложения, минимальные версии Gradle/AGP для плагинов."""
+import os
 import pathlib
 import re
 
@@ -55,3 +56,30 @@ if wp.exists():
         s = s.replace(mt.group(0), "gradle-8.13-all.zip")
         wp.write_text(s, encoding="utf-8")
     print("gradle wrapper checked")
+
+# --- Подпись постоянным ключом (если задан секрет NAV_KEYSTORE_PASSWORD) ---
+# Один и тот же ключ нужен, чтобы новая версия ставилась поверх старой.
+pw = os.environ.get("NAV_KEYSTORE_PASSWORD", "")
+gradle = root / "app" / "build.gradle.kts"
+if pw and gradle.exists():
+    ks = (root.parent / "android-signing" / "navigator.p12").as_posix()
+    g = gradle.read_text(encoding="utf-8")
+    block = f"""    signingConfigs {{
+        create("navigator") {{
+            storeFile = file("{ks}")
+            storePassword = System.getenv("NAV_KEYSTORE_PASSWORD")
+            keyAlias = "navigator"
+            keyPassword = System.getenv("NAV_KEYSTORE_PASSWORD")
+            storeType = "pkcs12"
+        }}
+    }}
+
+    buildTypes {{"""
+    if 'create("navigator")' not in g:
+        g = g.replace("    buildTypes {", block, 1)
+        g = g.replace('signingConfig = signingConfigs.getByName("debug")',
+                      'signingConfig = signingConfigs.getByName("navigator")', 1)
+        gradle.write_text(g, encoding="utf-8")
+    print("release signing: navigator key")
+else:
+    print("release signing: debug key (секрет NAV_KEYSTORE_PASSWORD не задан)")
