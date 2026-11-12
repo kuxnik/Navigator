@@ -39,7 +39,12 @@ jobs:
         run: python3 tool/patch_android.py
 
       - name: Зависимости
-        run: flutter pub get
+        run: |
+          flutter pub get
+          # flutter_inappwebview_android ссылается на устаревший proguard-файл, новый AGP его не принимает
+          for f in $HOME/.pub-cache/hosted/pub.dev/flutter_inappwebview_android-*/android/build.gradle; do
+            [ -f "$f" ] && sed -i "s/proguard-android.txt/proguard-android-optimize.txt/g" "$f" && echo "patched $f"
+          done
 
       - name: Проверка кода
         run: flutter analyze --no-fatal-infos --no-fatal-warnings

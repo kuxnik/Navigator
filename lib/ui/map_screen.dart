@@ -484,6 +484,33 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     return const SizedBox.shrink();
   }
 
+  /// Состояние слоя грунтовок — чтобы было видно, почему его нет на карте.
+  Widget _gradesStatus() {
+    if (!s.settings.osmGrades) return const SizedBox.shrink();
+    final o = s.overpass;
+    String? text;
+    Color color = C.text2;
+    if (_zoom < 12) {
+      text = 'Грунтовки: приблизьте карту';
+    } else if (o.loading) {
+      text = 'Грунтовки: загружаю…';
+    } else if (o.error != null) {
+      text = o.error;
+      color = C.red;
+    } else if (o.lastCount == 0 && o.ways.isEmpty) {
+      text = 'Грунтовки: здесь в OSM их нет';
+    }
+    if (text == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(color: C.panel, borderRadius: BorderRadius.circular(10)),
+        child: Text(text, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: color)),
+      ),
+    );
+  }
+
   Widget _rightColumn() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -733,6 +760,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                     _targetCard(),
                     if (s.target != null && s.pos != null) const SizedBox(height: 8),
                     _banner(),
+                    _gradesStatus(),
                     const SizedBox(height: 8),
                     Align(alignment: Alignment.topRight, child: _rightColumn()),
                     const Spacer(),

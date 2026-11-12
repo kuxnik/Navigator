@@ -45,7 +45,8 @@ class OverpassTracks extends ChangeNotifier {
   final List<List<double>> _loaded = []; // [s, w, n, e]
   bool loading = false;
   String? error;
-  int version = 0; // растёт при каждом изменении набора дорог
+  int version = 0;
+  int lastCount = -1; // сколько дорог пришло в последнем ответе // растёт при каждом изменении набора дорог
 
   bool covered(double s, double w, double n, double e) {
     for (final b in _loaded) {
@@ -84,6 +85,12 @@ class OverpassTracks extends ChangeNotifier {
         }
         final j = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
         final els = (j['elements'] as List?) ?? const [];
+        final remark = j['remark']?.toString();
+        if (els.isEmpty && remark != null && remark.isNotEmpty) {
+          lastErr = remark;
+          continue;
+        }
+        var cnt = 0;
         for (final el in els) {
           if (el is! Map || el['type'] != 'way') continue;
           final geom = el['geometry'];
@@ -97,7 +104,9 @@ class OverpassTracks extends ChangeNotifier {
           final tags = Map<String, dynamic>.from((el['tags'] as Map?) ?? const {});
           final id = (el['id'] as num).toInt();
           ways[id] = OsmWay(id, pts, classifyWay(tags));
+          cnt++;
         }
+        lastCount = cnt;
         _loaded.add([s, w, n, e]);
         lastErr = null;
         break;
