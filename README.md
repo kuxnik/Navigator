@@ -14,6 +14,17 @@
 
 Все сборки перечислены на странице [Releases](https://github.com/kuxnik/Navigator/releases). Каждое изменение кода само собирается и выкладывается туда. Запустить сборку вручную: Actions → «Сборка APK» → Run workflow.
 
+## Установка на iPhone
+
+В каждом релизе рядом с APK лежит `navigator.ipa` — сборка для iPhone без подписи. Подписать и поставить её можно бесплатно, своим Apple ID:
+
+1. На компьютер с Windows или macOS поставьте [Sideloadly](https://sideloadly.io) и iTunes (для Windows — версию с сайта Apple, не из Microsoft Store).
+2. Скачайте последнюю IPA: **https://github.com/kuxnik/Navigator/releases/latest/download/navigator.ipa**
+3. Подключите iPhone кабелем, перетащите IPA в Sideloadly, введите свой Apple ID и нажмите Start.
+4. На iPhone: Настройки → Основные → VPN и управление устройством → доверять своему Apple ID. В iOS 16 и новее ещё включите «Режим разработчика» (Настройки → Конфиденциальность и безопасность).
+
+С бесплатным Apple ID подпись действует 7 дней. Sideloadly умеет продлевать её сам, если в настройках включить автообновление и держать компьютер и iPhone в одной сети Wi-Fi.
+
 ## Что умеет версия 0.1
 
 - **Карта**
