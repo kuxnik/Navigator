@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../state/app_state.dart';
 import 'library_screen.dart';
-import 'strava_login.dart';
 import 'theme.dart';
 
 void showLayersSheet(BuildContext context, AppState s) {
@@ -66,42 +65,6 @@ void showLayersSheet(BuildContext context, AppState s) {
                         _Legend(Color(0xFFFF6B4A), 'джип', dashed: true),
                         _Legend(Color(0xFFD9B98A), 'нет данных'),
                       ]),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              _box(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                      secondary: const Icon(Icons.local_fire_department, color: Color(0xFFFF8A3D)),
-                      title: const Row(children: [
-                        Flexible(child: Text('Тепловая карта Strava', style: TextStyle(fontWeight: FontWeight.w600))),
-                        SizedBox(width: 8),
-                        _Badge('онлайн', Color(0xFF33264A), Color(0xFFD9B8FF)),
-                      ]),
-                      subtitle: Text(
-                        s.settings.stravaCookie == null
-                            ? 'нужен вход в Strava (бесплатный аккаунт)'
-                            : 'где ездили и ходили люди со Strava · вход ${_date(s.settings.stravaCookieDate)}',
-                        style: const TextStyle(fontSize: 12, color: C.text2),
-                      ),
-                      value: s.settings.strava && s.settings.stravaCookie != null,
-                      onChanged: s.settings.stravaCookie == null ? null : (v) => s.updateSettings((x) => x.strava = v),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(c);
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => StravaLoginScreen(state: s)));
-                        },
-                        icon: const Icon(Icons.login, size: 18),
-                        label: Text(s.settings.stravaCookie == null ? 'Войти в Strava' : 'Войти заново (если карта пропала)'),
-                      ),
                     ),
                   ],
                 ),
@@ -214,8 +177,3 @@ class _Legend extends StatelessWidget {
       ]);
 }
 
-String _date(String? iso) {
-  final d = iso == null ? null : DateTime.tryParse(iso);
-  if (d == null) return '—';
-  return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}';
-}

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -47,6 +48,66 @@ class OverpassTracks extends ChangeNotifier {
   String? error;
   int version = 0;
   int lastCount = -1; // сколько дорог пришло в последнем ответе // растёт при каждом изменении набора дорог
+
+  File? _file;
+
+  /// Загрузить ранее скачанные дороги с диска — повторно их не запрашиваем.
+  Future<void> load(File f) async {
+    _file = f;
+    try {
+      if (!await f.exists()) return;
+      final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+      for (final b in (j['b'] as List? ?? const [])) {
+        _loaded.add([for (final v in b as List) (v as num).toDouble()]);
+      }
+      for (final w in (j['w'] as List? ?? const [])) {
+        final m = w as Map;
+        final p = (m['p'] as List).map((v) => (v as num).toDouble()).toList();
+        final pts = <LatLng>[for (var i = 0; i + 1 < p.length; i += 2) LatLng(p[i], p[i + 1])];
+        final id = (m['i'] as num).toInt();
+        ways[id] = OsmWay(id, pts, Grade.values[(m['g'] as num).toInt()]);
+      }
+      version++;
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> _save() async {
+    final f = _file;
+    if (f == null) return;
+    try {
+      final data = {
+        'b': _loaded,
+        'w': [
+          for (final w in ways.values)
+            {
+              'i': w.id,
+              'g': w.grade.index,
+              'p': [
+                for (final p in w.points) ...[
+                  double.parse(p.latitude.toStringAsFixed(6)),
+                  double.parse(p.longitude.toStringAsFixed(6)),
+                ],
+              ],
+            },
+        ],
+      };
+      final tmp = File('${f.path}.tmp');
+      await tmp.writeAsString(jsonEncode(data));
+      await tmp.rename(f.path);
+    } catch (_) {}
+  }
+
+  /// Забыть скачанные дороги (для кнопки «очистить кэш»).
+  Future<void> clear() async {
+    ways.clear();
+    _loaded.clear();
+    version++;
+    try {
+      if (_file != null && await _file!.exists()) await _file!.delete();
+    } catch (_) {}
+    notifyListeners();
+  }
 
   bool covered(double s, double w, double n, double e) {
     for (final b in _loaded) {
@@ -109,6 +170,7 @@ class OverpassTracks extends ChangeNotifier {
         lastCount = cnt;
         _loaded.add([s, w, n, e]);
         lastErr = null;
+        _save();
         break;
       } catch (err) {
         lastErr = err;

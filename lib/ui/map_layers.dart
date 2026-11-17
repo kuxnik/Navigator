@@ -5,10 +5,12 @@ import 'package:latlong2/latlong.dart';
 import '../data/mbtiles.dart';
 import '../data/overpass.dart';
 import '../data/models.dart';
+import '../data/tile_cache.dart';
 import '../nav/geo.dart';
 import '../state/app_state.dart';
 
 const String kUserAgent = 'ru.kuxnik.navigator';
+const String kHttpUserAgent = 'ru.kuxnik.navigator (+https://github.com/kuxnik/Navigator)';
 
 /// Подложка: выбранная карта .mbtiles или онлайн OSM, если карт нет.
 Widget baseTileLayer(AppState s) {
@@ -16,6 +18,7 @@ Widget baseTileLayer(AppState s) {
     return TileLayer(
       key: const ValueKey('sat'),
       urlTemplate: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      tileProvider: CachedTileProvider('sat', kHttpUserAgent),
       maxNativeZoom: 19,
       maxZoom: 20,
       userAgentPackageName: kUserAgent,
@@ -37,6 +40,7 @@ Widget baseTileLayer(AppState s) {
   return TileLayer(
     key: const ValueKey('osm'),
     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    tileProvider: CachedTileProvider('osm', kHttpUserAgent),
     maxNativeZoom: 19,
     maxZoom: 20,
     userAgentPackageName: kUserAgent,
@@ -47,21 +51,8 @@ Widget baseTileLayer(AppState s) {
 Widget osmTracesLayer() => TileLayer(
       key: const ValueKey('osm_gps'),
       urlTemplate: 'https://gps.tile.openstreetmap.org/lines/{z}/{x}/{y}.png',
+      tileProvider: CachedTileProvider('osm_gps', kHttpUserAgent),
       maxNativeZoom: 20,
-      maxZoom: 20,
-      userAgentPackageName: kUserAgent,
-    );
-
-/// Тепловая карта Strava (все виды активности). С 2025 года Strava отдаёт тайлы
-/// только с cookie вошедшего пользователя — их получаем через вход в приложении.
-Widget stravaLayer(String cookie) => TileLayer(
-      key: ValueKey('strava_${cookie.hashCode}'),
-      urlTemplate: 'https://content-a.strava.com/identified/globalheat/all/hot/{z}/{x}/{y}.png?v=19',
-      tileProvider: NetworkTileProvider(headers: {
-        'Cookie': cookie,
-        'Referer': 'https://www.strava.com/',
-      }),
-      maxNativeZoom: 15,
       maxZoom: 20,
       userAgentPackageName: kUserAgent,
     );

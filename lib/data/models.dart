@@ -207,9 +207,6 @@ const String kSatMapId = '__sat';
 class Settings {
   String? mapId; // null — онлайн OSM, kSatMapId — спутник онлайн
   bool osmGrades = true;
-  bool strava = true;
-  String? stravaCookie;
-  String? stravaCookieDate;
   bool osmTraces = false;
   bool mineLayer = true;
   bool carOnly = false;
@@ -221,9 +218,6 @@ class Settings {
         'mapId': mapId,
         'osmTraces': osmTraces,
         'osmGrades': osmGrades,
-        'strava': strava,
-        'stravaCookie': stravaCookie,
-        'stravaCookieDate': stravaCookieDate,
         'mineLayer': mineLayer,
         'carOnly': carOnly,
         'ruler': ruler,
@@ -235,9 +229,6 @@ class Settings {
     ..mapId = j['mapId'] as String?
     ..osmTraces = j['osmTraces'] as bool? ?? false
     ..osmGrades = j['osmGrades'] as bool? ?? true
-    ..strava = j['strava'] as bool? ?? true
-    ..stravaCookie = j['stravaCookie'] as String?
-    ..stravaCookieDate = j['stravaCookieDate'] as String?
     ..mineLayer = j['mineLayer'] as bool? ?? true
     ..carOnly = j['carOnly'] as bool? ?? false
     ..ruler = j['ruler'] as bool? ?? true

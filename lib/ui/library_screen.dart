@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../data/models.dart';
+import '../data/tile_cache.dart';
 import '../nav/geo.dart';
 import '../state/app_state.dart';
 import 'theme.dart';
@@ -114,6 +115,8 @@ class LibraryScreen extends StatelessWidget {
                 icon: const Icon(Icons.create_new_folder_outlined),
                 label: const Text('Добавить .mbtiles из «Файлов»'),
               ),
+              const SizedBox(height: 6),
+              _CacheTile(state: s),
               const SizedBox(height: 20),
               const _Header('Треки на карте'),
               if (s.tracks.isEmpty)
@@ -266,6 +269,65 @@ class _TrackTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Сколько места занимают скачанные онлайн-карты и грунтовки; очистка.
+class _CacheTile extends StatefulWidget {
+  const _CacheTile({required this.state});
+
+  final AppState state;
+
+  @override
+  State<_CacheTile> createState() => _CacheTileState();
+}
+
+class _CacheTileState extends State<_CacheTile> {
+  int? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    final b = await TileCache.size();
+    if (mounted) setState(() => _bytes = b);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mb = _bytes == null ? '…' : '${(_bytes! / (1024 * 1024)).toStringAsFixed(0)} МБ';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: C.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: C.cardBorder),
+      ),
+      child: Row(children: [
+        const Icon(Icons.save_alt, color: C.text2),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Сохранено на телефоне', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text('онлайн-карты: $mb · грунтовок: ${widget.state.overpass.ways.length}',
+                style: const TextStyle(fontSize: 12, color: C.text2)),
+          ]),
+        ),
+        TextButton(
+          onPressed: () async {
+            final ok = await _confirm(context, 'Удалить сохранённые онлайн-карты и грунтовки? Они скачаются заново при следующем просмотре.');
+            if (!ok) return;
+            await TileCache.clear();
+            await widget.state.overpass.clear();
+            await _refresh();
+          },
+          child: const Text('Очистить'),
+        ),
+      ]),
     );
   }
 }

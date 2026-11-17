@@ -104,6 +104,7 @@ class AppState extends ChangeNotifier {
     tracks = await storage.loadTracks();
     maps = await storage.loadMaps();
     settings = await storage.loadSettings();
+    await overpass.load(File('${storage.root.path}/osm_tracks.json'));
     await _recoverRecording();
     headingFilter.start();
     ready = true;
