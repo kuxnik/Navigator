@@ -38,8 +38,10 @@ jobs:
           NAV_KEYSTORE_PASSWORD: ${{ secrets.NAV_KEYSTORE_PASSWORD }}
         run: python3 tool/patch_android.py
 
-      - name: Зависимости
-        run: flutter pub get
+      - name: Зависимости и заставка
+        run: |
+          flutter pub get
+          dart run flutter_native_splash:create
 
       - name: Проверка кода
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -80,8 +82,10 @@ jobs:
           rm -f test/widget_test.dart
           python3 tool/patch_ios.py
 
-      - name: Зависимости
-        run: flutter pub get
+      - name: Зависимости и заставка
+        run: |
+          flutter pub get
+          dart run flutter_native_splash:create
 
       - name: Сборка под iPhone (без подписи)
         run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
