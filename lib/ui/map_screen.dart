@@ -471,44 +471,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         ]),
       );
     }
-    if (s.pos == null) {
-      return const Panel(
-        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(children: [
-          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-          SizedBox(width: 10),
-          Text('Поиск спутников…', style: TextStyle(color: C.text)),
-        ]),
-      );
-    }
     return const SizedBox.shrink();
-  }
-
-  /// Состояние слоя грунтовок — чтобы было видно, почему его нет на карте.
-  Widget _gradesStatus() {
-    if (!s.settings.osmGrades) return const SizedBox.shrink();
-    final o = s.overpass;
-    String? text;
-    Color color = C.text2;
-    if (_zoom < 12) {
-      text = 'Грунтовки: приблизьте карту';
-    } else if (o.loading) {
-      text = 'Грунтовки: загружаю…';
-    } else if (o.error != null) {
-      text = o.error;
-      color = C.red;
-    } else if (o.lastCount == 0 && o.ways.isEmpty) {
-      text = 'Грунтовки: здесь в OSM их нет';
-    }
-    if (text == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(color: C.panel, borderRadius: BorderRadius.circular(10)),
-        child: Text(text, maxLines: 3, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: color)),
-      ),
-    );
   }
 
   Widget _rightColumn() {
@@ -556,53 +519,57 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     final acc = s.shownAccuracy;
     final srcColor = dr ? C.accent : (s.pos == null ? C.grey : C.green);
     final srcLabel = dr ? 'Счисление' : s.headingSource;
-    Widget cell(String v, String l) => Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(v, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: C.text, height: 1)),
-                const SizedBox(height: 3),
-                Text(l, style: const TextStyle(fontSize: 11, color: C.text2)),
-              ],
-            ),
+    // Без фона: читаемость на любой подложке даёт тёмная обводка-тень у текста.
+    const halo = [
+      Shadow(color: Color(0xE6000000), blurRadius: 3),
+      Shadow(color: Color(0xE6000000), blurRadius: 6),
+    ];
+    const big = TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: C.text, height: 1, shadows: halo);
+    const small = TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: C.text, shadows: halo);
+    Widget cell(Widget top, String label) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [top, const SizedBox(height: 3), Text(label, style: small)],
           ),
         );
-    return Panel(
-      padding: EdgeInsets.zero,
-      child: SizedBox(
-        height: 62,
+    return SizedBox(
+      height: 58,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
         child: Row(
           children: [
-            cell('${dr ? '≈' : ''}${(s.speed * 3.6).round()}', 'км/ч'),
-            const VerticalDivider(width: 1, color: C.panelBorder),
-            cell(h == null ? '—' : '${h.round()}°', 'курс'),
-            const VerticalDivider(width: 1, color: C.panelBorder),
+            cell(Text('${dr ? '≈' : ''}${(s.speed * 3.6).round()}', style: big), 'км/ч'),
+            cell(
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                if (h != null)
+                  Transform.rotate(
+                    angle: deg2rad(h),
+                    child: const Icon(Icons.navigation, size: 24, color: C.text, shadows: halo),
+                  ),
+                if (h != null) const SizedBox(width: 4),
+                Text(h == null ? '—' : '${h.round()}°', style: big),
+              ]),
+              'курс',
+            ),
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(children: [
-                      Container(
-                          width: 8, height: 8, decoration: BoxDecoration(color: srcColor, shape: BoxShape.circle)),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(srcLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: srcColor)),
-                      ),
-                    ]),
-                    const SizedBox(height: 4),
-                    Text(acc == null ? 'точность —' : 'точность ±${acc.round()} м',
-                        style: const TextStyle(fontSize: 12, color: C.text2)),
-                  ],
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(children: [
+                    Container(width: 9, height: 9, decoration: BoxDecoration(color: srcColor, shape: BoxShape.circle)),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(srcLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: srcColor, shadows: halo)),
+                    ),
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(acc == null ? 'GPS —' : 'GPS ±${acc.round()} м', style: small),
+                ],
               ),
             ),
           ],
@@ -760,7 +727,6 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                     _targetCard(),
                     if (s.target != null && s.pos != null) const SizedBox(height: 8),
                     _banner(),
-                    _gradesStatus(),
                     const SizedBox(height: 8),
                     Align(alignment: Alignment.topRight, child: _rightColumn()),
                     const Spacer(),
