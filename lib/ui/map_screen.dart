@@ -8,6 +8,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' hide Path;
 
+import '../data/models.dart';
 import '../nav/geo.dart';
 import '../state/app_state.dart';
 import 'layers_sheet.dart';
@@ -472,6 +473,32 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     return const SizedBox.shrink();
   }
 
+  /// Обязательная подпись источников карты (лицензии OSM и Esri).
+  Widget _attribution() {
+    final parts = <String>[];
+    final id = s.settings.mapId;
+    if (id == kSatMapId) {
+      parts.add('Esri, Maxar, Earthstar Geographics');
+    }
+    final osmBase = id == null || (s.currentMap == null && id != kSatMapId);
+    if (osmBase || s.settings.osmGrades || s.settings.osmTraces) parts.add('© OpenStreetMap');
+    if (parts.isEmpty) return const SizedBox.shrink();
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Text(
+          parts.join(' · '),
+          style: const TextStyle(
+            fontSize: 10,
+            color: Color(0xCCFFFFFF),
+            shadows: [Shadow(color: Color(0xE6000000), blurRadius: 3)],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _rightColumn() {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -728,6 +755,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                     const SizedBox(height: 8),
                     Align(alignment: Alignment.topRight, child: _rightColumn()),
                     const Spacer(),
+                    _attribution(),
                     _infoRow(),
                     const SizedBox(height: 8),
                     _buttonsRow(),
