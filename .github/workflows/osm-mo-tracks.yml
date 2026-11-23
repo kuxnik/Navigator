@@ -1,0 +1,46 @@
+name: Грунтовки МО в GPX
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tool/osm_mo_tracks.py
+      - .github/workflows/osm-mo-tracks.yml
+
+permissions:
+  contents: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Скачать грунтовки OSM и нарезать на GPX
+        run: python3 tool/osm_mo_tracks.py mo_tracks
+
+      - name: Список файлов
+        run: cat mo_tracks/СПИСОК.txt
+
+      - name: Релиз с GPX
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: osm-mo-tracks
+          name: Грунтовки Московской области (GPX для Компас 55)
+          make_latest: false
+          body: |
+            Лесные и полевые дороги (highway=track) из OpenStreetMap по Московской области и Москве, по проходимости.
+            Нарезаны квадратами примерно 45×40 км, крупные поделены на части. Каждый файл не больше 6 МБ.
+
+            **mo_tracks.zip** — все файлы одним архивом и СПИСОК.txt с размерами и числом дорог.
+            Отдельные GPX ниже — можно скачать только нужные квадраты.
+            Имя файла — юго-западный угол: например, mo_55.00N_37.05E.gpx — от 55.00° с. ш., 37.05° в. д.
+
+            В каждом файле до 4 треков: любая машина / кроссовер / джип / класс не указан.
+
+            Данные © участники OpenStreetMap, лицензия ODbL. Обновлено: ${{ github.run_id }}.
+          files: |
+            mo_tracks.zip
+            mo_tracks/*.gpx
+            mo_tracks/СПИСОК.txt
