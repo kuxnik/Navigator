@@ -1,24 +1,15 @@
 """Грунтовки OpenStreetMap по Московской области (и Москве) в GPX-файлы,
 нарезанные на куски, чтобы их открывали Компас 55 и другие навигаторы.
 
-Запуск: python3 tool/osm_mo_tracks.py out_dir
+Запуск: python3 tool/osm_mo_tracks.py tracks.geojsonseq out_dir
+(файл — результат `osmium export -f geojsonseq`, см. workflow osm-mo-tracks.yml).
 Только стандартная библиотека Python. Данные © участники OpenStreetMap, ODbL.
 """
 import json
 import math
 import os
 import sys
-import time
-import urllib.parse
-import urllib.request
 import zipfile
-
-SERVERS = [
-    "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-]
-UA = "ru.kuxnik.navigator (+https://github.com/kuxnik/Navigator) mo-tracks export"
 
 # Сетка поверх МО: шаг 0.4° по широте и 0.65° по долготе (~45 × 40 км)
 LAT0, LAT1, DLAT = 54.20, 57.00, 0.40
@@ -45,33 +36,6 @@ def classify(tags):
     if tt in ("grade1", "grade2") or sm in ("good", "intermediate", "excellent"):
         return "good"
     return "unknown"
-
-
-def query(s, w, n, e):
-    q = (
-        '[out:json][timeout:300];'
-        'area["ISO3166-2"~"^RU-(MOS|MOW)$"]->.a;'
-        f'(way["highway"="track"](area.a)({s},{w},{n},{e});'
-        f'way["4wd_only"="yes"](area.a)({s},{w},{n},{e}););'
-        'out tags geom;'
-    )
-    body = urllib.parse.urlencode({"data": q}).encode()
-    last = None
-    for attempt in range(6):
-        url = SERVERS[attempt % len(SERVERS)]
-        try:
-            req = urllib.request.Request(url, data=body, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=400) as r:
-                j = json.loads(r.read().decode("utf-8"))
-            rem = j.get("remark")
-            if rem and not j.get("elements") and "error" in rem.lower():
-                raise RuntimeError(rem)
-            return j.get("elements", [])
-        except Exception as ex:  # noqa: BLE001
-            last = ex
-            print(f"   попытка {attempt + 1} ({url}): {ex}", flush=True)
-            time.sleep(20 + attempt * 20)
-    raise RuntimeError(f"Overpass не ответил: {last}")
 
 
 def simplify(pts, eps_m):
@@ -156,40 +120,54 @@ def write_piece(out_dir, name, title, ways, index, depth=0):
     print(f"   → {name}.gpx {len(data) / 1e6:.1f} МБ, дорог: {sum(counts.values())}", flush=True)
 
 
+def load_geojsonseq(path):
+    """Линии из `osmium export -f geojsonseq` → список (grade, pts)."""
+    ways = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip().lstrip("\x1e")
+            if not line:
+                continue
+            ft = json.loads(line)
+            geom = ft.get("geometry") or {}
+            props = ft.get("properties") or {}
+            lines = []
+            if geom.get("type") == "LineString":
+                lines = [geom["coordinates"]]
+            elif geom.get("type") == "MultiLineString":
+                lines = geom["coordinates"]
+            for coords in lines:
+                pts = [(c[1], c[0]) for c in coords]
+                if len(pts) >= 2:
+                    ways.append((classify(props), simplify(pts, SIMPLIFY_M)))
+    return ways
+
+
 def main():
-    out_dir = sys.argv[1] if len(sys.argv) > 1 else "mo_tracks"
+    src = sys.argv[1]
+    out_dir = sys.argv[2] if len(sys.argv) > 2 else "mo_tracks"
     os.makedirs(out_dir, exist_ok=True)
-    index = []
-    seen = set()
+    ways = load_geojsonseq(src)
+    print(f"Дорог прочитано: {len(ways)}", flush=True)
     rows = int(round((LAT1 - LAT0) / DLAT))
     cols = int(round((LON1 - LON0) / DLON))
-    for r in range(rows):
-        for c in range(cols):
-            s = LAT0 + r * DLAT
-            n = s + DLAT
-            w = LON0 + c * DLON
-            e = w + DLON
-            name = f"mo_{s:.2f}N_{w:.2f}E"
-            print(f"Лист {r + 1}-{c + 1}: {s:.2f}–{n:.2f}N, {w:.2f}–{e:.2f}E", flush=True)
-            els = query(s, w, n, e)
-            ways = []
-            for el in els:
-                if el.get("type") != "way" or el["id"] in seen:
-                    continue
-                geom = el.get("geometry") or []
-                pts = [(g["lat"], g["lon"]) for g in geom if "lat" in g]
-                if len(pts) < 2:
-                    continue
-                seen.add(el["id"])
-                ways.append((classify(el.get("tags") or {}), simplify(pts, SIMPLIFY_M)))
-            if ways:
-                write_piece(out_dir, name, f"Грунтовки МО {s:.2f}N {w:.2f}E ", ways, index)
-            else:
-                print("   пусто", flush=True)
-            time.sleep(5)
+    cells = {}
+    for g, pts in ways:
+        la, lo = pts[len(pts) // 2]
+        r = int((la - LAT0) // DLAT)
+        c = int((lo - LON0) // DLON)
+        if 0 <= r < rows and 0 <= c < cols:
+            cells.setdefault((r, c), []).append((g, pts))
+    index = []
+    for (r, c) in sorted(cells):
+        s_ = LAT0 + r * DLAT
+        w_ = LON0 + c * DLON
+        name = f"mo_{s_:.2f}N_{w_:.2f}E"
+        print(f"Лист {r + 1}-{c + 1}: {s_:.2f}N {w_:.2f}E, дорог {len(cells[(r, c)])}", flush=True)
+        write_piece(out_dir, name, f"Грунтовки МО {s_:.2f}N {w_:.2f}E ", cells[(r, c)], index)
 
     lines = [
-        "Грунтовки OpenStreetMap — Московская область и Москва",
+        "Грунтовки OpenStreetMap — Московская область и Москва (с краями соседних областей)",
         "Данные © участники OpenStreetMap, лицензия ODbL (https://www.openstreetmap.org/copyright)",
         "",
         "Каждый файл — квадрат примерно 45×40 км (большие поделены на части a–d).",
@@ -206,7 +184,7 @@ def main():
     with zipfile.ZipFile("mo_tracks.zip", "w", zipfile.ZIP_DEFLATED) as z:
         for fn in sorted(os.listdir(out_dir)):
             z.write(os.path.join(out_dir, fn), fn)
-    print(f"Готово: файлов {len(index)}, дорог {len(seen)}", flush=True)
+    print(f"Готово: файлов {len(index)}", flush=True)
 
 
 if __name__ == "__main__":

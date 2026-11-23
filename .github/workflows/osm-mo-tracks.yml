@@ -17,8 +17,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Скачать грунтовки OSM и нарезать на GPX
-        run: python3 tool/osm_mo_tracks.py mo_tracks
+      - name: osmium
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+
+      - name: Скачать выгрузку OSM (Центральный ФО, Geofabrik)
+        run: |
+          curl -fsSL --retry 5 -o cfd.osm.pbf https://download.geofabrik.de/russia/central-fed-district-latest.osm.pbf
+          ls -la cfd.osm.pbf
+
+      - name: Вырезать МО и грунтовки
+        run: |
+          osmium extract -b 35.10,54.20,40.30,57.00 cfd.osm.pbf -o mo.osm.pbf
+          osmium tags-filter mo.osm.pbf w/highway=track w/4wd_only=yes -o tracks.osm.pbf
+          osmium export tracks.osm.pbf -f geojsonseq --geometry-types=linestring -o tracks.geojsonseq
+          wc -l tracks.geojsonseq
+
+      - name: Нарезать на GPX
+        run: python3 tool/osm_mo_tracks.py tracks.geojsonseq mo_tracks
 
       - name: Список файлов
         run: cat mo_tracks/СПИСОК.txt
